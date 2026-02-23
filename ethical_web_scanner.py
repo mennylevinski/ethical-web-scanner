@@ -413,7 +413,7 @@ def main():
     print(f"MIT License – © 2025 Menny Levinski\n")
 
     while True:
-        target = input("\nEnter target (URL or domain, e.g., https://example.com or example.com): ").strip()
+        target = input("Enter target (URL or domain, e.g., https://example.com or example.com): ").strip()
 
         # If bare domain, try HTTPS first
         if not target.startswith(('http://', 'https://')):
