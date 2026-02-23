@@ -4,7 +4,7 @@
 """
 Author: Menny Levinski
 
-Cross-platform Interactive Web Vulnerability Scanner for Ethical Diagnostics.
+Cross-platform Passive Web Vulnerability Scanner for Ethical Diagnostics.
 
 Requirements:
  - Python 3.0+
