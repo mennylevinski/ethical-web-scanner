@@ -410,10 +410,10 @@ def scan_and_report(target):
     return os.path.abspath(html_report)
 
 def main():
-    print('=== Interactive Web Vulnerability Scanner (detailed report, passive checks) ===')
+    print(f"MIT License – © 2025 Menny Levinski\n")
 
     while True:
-        target = input("Enter target (URL or domain, e.g., https://example.com or example.com): ").strip()
+        target = input("\nEnter target (URL or domain, e.g., https://example.com or example.com): ").strip()
 
         # If bare domain, try HTTPS first
         if not target.startswith(('http://', 'https://')):
