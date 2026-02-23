@@ -17,7 +17,7 @@ Use responsibly and in compliance with your local governance.
 
 ### Checks performed (for the requested URL):
 - HTTP request & response metadata (status code, URL, final URL after redirects, content-type, server header)
-- Security headers and values (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, Content-Security-Policy)
+- Security headers and values (X-Content-Type-Options, X-Frame-Options, Content-Security-Policy)
 - Cookie analysis (parses Set-Cookie headers and looks for Secure, HttpOnly, SameSite)
 - Basic reflected XSS pattern search (detecting passive pattern matching only)
 - Simple injection-like pattern search in body (SQLi-like keywords), passive only
