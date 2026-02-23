@@ -1,6 +1,6 @@
 # Ethical Web Scanner
 
-An interactive, cross-platform web vulnerability scanner designed to improve security posture via ethical diagnostics.
+An interactive, cross-platform passive web vulnerability scanner designed to improve security posture via ethical diagnostics.
 
 ---
 
@@ -16,12 +16,12 @@ Use responsibly and in compliance with your local governance.
 ## 🧬 Features
 
 ### Checks performed (for the requested URL):
-- HTTP request & response metadata (status code, URL, final URL after redirects, content-type, server header, content-length)
-- Security headers presence and values (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, Content-Security-Policy)
+- HTTP request & response metadata (status code, URL, final URL after redirects, content-type, server header)
+- Security headers and values (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security, Content-Security-Policy)
 - Cookie analysis (parses Set-Cookie headers and looks for Secure, HttpOnly, SameSite)
 - Basic reflected XSS pattern search (detecting passive pattern matching only)
 - Simple injection-like pattern search in body (SQLi-like keywords), passive only
-- TLS / certificate info for https targets: certificate subject, issuer and validity
+- ASN provider and TLS certificate information for HTTPS targets: certificate subject, issuer, and validity.
 - Report includes a full checklist section describing each check and its result
 
 ---
