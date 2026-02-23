@@ -12,6 +12,7 @@ Requirements:
 """
 
 import sys
+import re
 import os
 import time
 import requests
@@ -31,13 +32,18 @@ VULN_CHECKS = [
 REFLECTED_XSS_PATTERNS = ["<script>alert(1)</script>"]
 SQLI_KEYWORDS = ['select ', 'union ', 'insert ', 'update ', 'delete ', 'drop ', 'or 1=1', "' or '1'='1"]
 
-
+# --- Modules ---
 def ensure_reports_dir():
     if not os.path.isdir(REPORTS_DIR):
         os.makedirs(REPORTS_DIR, exist_ok=True)
 
-def now_utc_ts():
-    return datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+# Safe for filenames
+def now_utc_ts_file():
+    return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H-%M-%SZ')
+
+# Human-readable for HTML report
+def now_utc_ts_display():
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
 
 def validate_url(u):
     try:
@@ -129,6 +135,24 @@ def tls_info_for_host(netloc):
         info['error'] = str(e)
     return info
 
+def get_asn_info(target):
+    """
+    Returns ASN info for a domain or IP.
+    """
+    try:
+        # resolve domain to IP
+        ip_addr = socket.gethostbyname(urlparse(target).netloc)
+        # query ipinfo.io
+        resp = requests.get(f'https://ipinfo.io/{ip_addr}/json', timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            asn = data.get('org', '')  # usually in format "ASXXXX Name"
+            return {'ip': ip_addr, 'asn': asn}
+        else:
+            return {'ip': ip_addr, 'asn': 'N/A'}
+    except Exception as e:
+        return {'ip': 'N/A', 'asn': f'Error: {e}'}
+
 def analyze_response(resp):
     findings = []
     details = {}
@@ -205,10 +229,40 @@ def save_raw_response_files(report_base, resp):
         print('Failed saving raw body:', e)
     return headers_file, body_file
 
-def generate_html_report(report_path, target_url, ts, findings, details, tls_info, raw_headers_path, raw_body_path):
+def generate_html_report(report_path, target_url, ts, findings, details, tls_info, raw_headers_path, raw_body_path, asn_info):
     # Create a detailed HTML report documenting every check
     with open(report_path, 'w', encoding='utf-8') as f:
-        f.write('<!doctype html>\n<html><head><meta charset="utf-8"><title>Scan Report</title></head><body>\n')
+        f.write('''<!doctype html>
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <title>Scan Report</title>
+        <style>
+            body {
+                font-family: Arial, Helvetica, sans-serif;
+                margin: 10px;
+                background-color: #f9f9f9;
+            }
+            h1, h2, h3, h4 {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            }
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+            th {
+                background-color: #222;
+                color: white;
+            }
+            td, th {
+                padding: 8px;
+                border: 1px solid #ccc;
+                text-align: left;
+            }
+        </style>
+        </head>
+        <body>
+        ''')
         f.write(f'<h1>Scan Report for {target_url}</h1>\n')
         f.write(f'<p>Timestamp (UTC): {ts}</p>\n')
         f.write('<h2>Summary of Findings</h2>\n')
@@ -284,25 +338,41 @@ def generate_html_report(report_path, target_url, ts, findings, details, tls_inf
         else:
             f.write('<p>Not an HTTPS target or TLS check not performed.</p>\n')
 
+        # ASN
+        if asn_info:
+            f.write('<h3>IP & ASN Info</h3>\n')
+            f.write('<ul>\n')
+            f.write(f"<li>Resolved IP: {asn_info.get('ip')}</li>\n")
+            f.write(f"<li>ASN / Organization: {asn_info.get('asn')}</li>\n")
+            f.write('</ul>\n')
+            
+        else:
+            f.write('<p>ASN check not performed.</p>\n')
+
         # Links to raw files
         f.write('<h3>Raw Response Files</h3>\n')
         f.write(f'<ul><li><a href="{os.path.basename(raw_headers_path)}">Raw response headers</a></li>')
         f.write(f'<li><a href="{os.path.basename(raw_body_path)}">Raw response body (HTML)</a></li></ul>\n')
 
-        f.write('<hr><p>Note: These are passive, non-destructive checks intended for training. For full dynamic scans use a specialized scanner (ZAP, Burp, etc.) with authorization.</p>\n')
+        f.write('<hr><p>Note: These are passive, non-destructive checks intended for training.</p>\n')
         f.write('</body></html>')
 
 def scan_and_report(target):
     ensure_reports_dir()
-    ts = now_utc_ts()
-    safe_host = urlparse(target).netloc.replace(':', '_')
-    base = os.path.join(REPORTS_DIR, f'report_{safe_host}_{ts}')
+
+    ts_file = now_utc_ts_file()       # for filenames
+    ts_display = now_utc_ts_display() # human-readable timestamp for HTML
+
+    # Make host Windows-safe
+    safe_host = re.sub(r'[\\/:*?"<>|]', '_', urlparse(target).netloc)
+    base = os.path.join(REPORTS_DIR, f'report_{safe_host}_{ts_file}')
     html_report = base + '.html'
 
     resp = None
     findings = []
     details = {}
     tls_info = None
+    asn_info = get_asn_info(target)
 
     try:
         resp = fetch_url(target)
@@ -310,41 +380,53 @@ def scan_and_report(target):
         findings.append(f'Failed to fetch target: {e}')
 
     if resp is not None:
-        # Save raw
         raw_headers_path, raw_body_path = save_raw_response_files(base, resp)
-        # Analyze
         fnds, det = analyze_response(resp)
         findings.extend(fnds)
         details.update(det)
-        # TLS info for https
         if urlparse(target).scheme == 'https':
             tls_info = tls_info_for_host(urlparse(target).netloc)
     else:
         raw_headers_path = base + '_raw_headers.txt'
         raw_body_path = base + '_raw_body.html'
-        # create placeholder files
         with open(raw_headers_path, 'w', encoding='utf-8') as f:
             f.write('No response')
         with open(raw_body_path, 'w', encoding='utf-8') as f:
             f.write('')
 
-    # Write HTML report
-    generate_html_report(html_report, target, ts, findings, details, tls_info, raw_headers_path, raw_body_path)
-    return html_report
+    # ✅ Correct call with ts_display
+    generate_html_report(
+        html_report,
+        target,
+        ts_display,
+        findings,
+        details,
+        tls_info,
+        raw_headers_path,
+        raw_body_path,
+        asn_info
+    )
+
+    return os.path.abspath(html_report)
 
 def main():
     print('=== Interactive Web Vulnerability Scanner (detailed report, passive checks) ===')
-    print('LEGAL: You MUST have explicit written permission to scan any target that is not your own lab.')
-    consent = input('I confirm I have permission to test the target described below (type YES to continue): ').strip()
-    if consent.upper() != 'YES':
-        input('Consent not given. Press Enter to exit...')
-        return
 
     while True:
-        target = input("Enter the full target URL (including http:// or https://) to scan: ").strip()
+        target = input("Enter target (URL or domain, e.g., https://example.com or example.com): ").strip()
+
+        # If bare domain, try HTTPS first
+        if not target.startswith(('http://', 'https://')):
+            target_https = 'https://' + target
+            if validate_url(target_https):
+                target = target_https
+            else:
+                # fallback to HTTP
+                target = 'http://' + target
+
         if validate_url(target):
             break
-        print("Invalid URL. Make sure it includes http:// or https://\n")
+        print("Invalid input. Make sure it's a valid domain or URL.\n")
 
     print(f'Scanning {target} ... (this may take a few seconds)')
     report = scan_and_report(target)
