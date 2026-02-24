@@ -1,4 +1,4 @@
-# Ethical Web Scanner
+# Passive Web Scanner
 
 An interactive, cross-platform passive web vulnerability scanner designed to improve security posture through ethical diagnostics and training.
 
@@ -36,7 +36,7 @@ Use responsibly and in compliance with your local governance.
   pip install requests
 
 ### 2️ Download & Run
-- [ethical_web_scanner.py](ethical_web_scanner.py)
+- [passive_web_scanner.py](passive_web_scanner.py)
 
 ---
 
